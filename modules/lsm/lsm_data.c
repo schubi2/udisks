@@ -33,6 +33,7 @@
 #include <libconfig.h>
 #include <string.h>
 #include <stdint.h>
+#include <sys/stat.h>
 
 #define _STD_LSM_SIM_URI "sim://"
 #define _STD_LSM_HPSA_URI "hpsa://"
@@ -45,6 +46,8 @@
 #define _STD_LSM_CONF_EXT_URIS_KEYNAME "extra_uris"
 #define _STD_LSM_CONF_EXT_PASS_KEYNAME "extra_passwords"
 #define _STD_LSM_CONNECTION_DEFAULT_TMO 30000
+
+#define PATH_VENDORDIR "/usr/lib"
 
 /*
  * _LsmUriSet is holding the URI and password string pointers.
@@ -177,8 +180,22 @@ _lsm_raid_type_to_str (lsm_volume_raid_type raid_type)
     }
 }
 
+
+#ifdef HAVE_LIBECONF
 static char *
-_lsm_get_conf_path (UDisksDaemon *daemon)
+_lsm_get_vendor_conf_path (void)
+{
+  /* This should give us '<vendordir>/modules.conf.d/udisks2_lsm.conf' */
+  return g_build_filename (PATH_VENDORDIR,
+                           PROJECT_SYSCONF_DIR,
+                           _STD_LSM_CONF_PATH,
+                           _STD_LSM_CONF_FILE,
+                           NULL);
+}
+#endif
+
+static char *
+_lsm_get_sys_conf_path (UDisksDaemon *daemon)
 {
   UDisksConfigManager *config_manager;
 
@@ -211,6 +228,9 @@ _load_module_conf (UDisksDaemon *daemon, GError **error)
   char *conf_path;
   int i;
   gboolean ret = TRUE;
+#ifdef HAVE_LIBECONF
+  struct stat st;
+#endif
 
   udisks_debug ("LSM: loading config file");
 
@@ -221,7 +241,16 @@ _load_module_conf (UDisksDaemon *daemon, GError **error)
     }
 
   /* Get the abs config file path. */
-  conf_path = _lsm_get_conf_path (daemon);
+  conf_path = _lsm_get_sys_conf_path (daemon);
+
+#ifdef HAVE_LIBECONF
+  if (stat(conf_path, &st) != 0)
+    {
+      /* Trying if there is a vendor defined configuration file */
+      g_free (conf_path);
+      conf_path = _lsm_get_vendor_conf_path();
+    }
+#endif
 
   config_init (&cfg);
   if (config_read_file (&cfg, conf_path) != CONFIG_TRUE)

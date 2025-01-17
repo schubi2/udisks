@@ -247,6 +247,24 @@ if test "x$with_tmpfilesdir" != "xno"; then
   AC_SUBST([tmpfilesdir], [$with_tmpfilesdir])
 fi
 
+# libeconf
+AC_ARG_WITH([econf],
+  AS_HELP_STRING([--with-econf], [use libeconf for parsing configuration files in /usr/lib too]),
+  [], [with_econf=no]
+)
+
+have_econf=no
+AS_IF([test "x$with_econf" != xno], [
+  PKG_CHECK_MODULES([ECONF], [libeconf], [have_econf=yes], [have_econf=no])
+    AS_CASE([$with_econf:$have_econf],
+    [yes:no],
+      [AC_MSG_ERROR([libeconf expected but libeconf not found])],
+    [*:yes],
+       AC_DEFINE([HAVE_LIBECONF], [1], [Define if libeconf is available])
+  )
+])
+AM_CONDITIONAL([HAVE_ECONF], [test "x$have_econf" = xyes])
+
 # kernel modules
 AC_ARG_WITH([modloaddir],
   [AS_HELP_STRING([--with-modloaddir=DIR], [Directory for configuring kernel modules to load at boot])],
@@ -687,6 +705,7 @@ echo "
         using libelogind:           ${have_libelogind}
         use /media for mounting:    ${fhs_media}
         acl support:                ${have_acl}
+	libeconf support:           ${have_econf}
 
         compiler:                   ${CC}
         cflags:                     ${CFLAGS}
